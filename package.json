@@ -1,16 +1,16 @@
 {
   "private": true,
-  "displayName": "Plugin Name",
-  "name": "homebridge-plugin-name",
+  "displayName": "Intelligent Octopus Go",
+  "name": "homebridge-intelligent-octopus-go",
   "version": "1.0.0",
-  "description": "A short description about what your plugin does.",
+  "description": "Provides switches to give current status of Intelligent Octopus Go tariffs.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME.git"
+    "url": "https://github.com/jb8748/homebridge-intelligent-octopus-go.git"
   },
   "bugs": {
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
+    "url": "https://github.com/jb8748/homebridge-intelligent-octopus-go/issues"
   },
   "engines": {
     "node": "^18.17.0 || ^20.9.0",
