@@ -3,9 +3,8 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { IntelligentOctopusGoPlatform } from './platform';
 
 /**
- * Platform Accessory
- * An instance of this class is created for each accessory your platform registers
- * Each accessory may expose multiple services of different service types.
+ * Intelligent Octupus Go Platform Accessory
+ * An instance of this class is created for each switch type.
  */
 export class IntelligentOctopusGoPlatformAccessory {
   private service: Service;
@@ -16,7 +15,6 @@ export class IntelligentOctopusGoPlatformAccessory {
    */
   private exampleStates = {
     On: false,
-    Brightness: 100,
   };
 
   constructor(
@@ -26,8 +24,8 @@ export class IntelligentOctopusGoPlatformAccessory {
 
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'James Ball')
+      .setCharacteristic(this.platform.Characteristic.Model, '1.0.0')
       .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
@@ -46,9 +44,6 @@ export class IntelligentOctopusGoPlatformAccessory {
       .onSet(this.setOn.bind(this))                // SET - bind to the `setOn` method below
       .onGet(this.getOn.bind(this));               // GET - bind to the `getOn` method below
 
-    // register handlers for the Brightness Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .onSet(this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
 
     /**
      * Creating multiple services of the same type.
@@ -93,13 +88,14 @@ export class IntelligentOctopusGoPlatformAccessory {
 
   /**
    * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
+   * These are sent when the user changes the state of an accessory.
+   * Users cannot set our values but until I implemtn read-only we will handle, and ignore.
    */
   async setOn(value: CharacteristicValue) {
-    // implement your own code to turn your device on/off
-    this.exampleStates.On = value as boolean;
+    // do nothing
+    //this.exampleStates.On = value as boolean;
 
-    this.platform.log.debug('Set Characteristic On ->', value);
+    this.platform.log.debug('Attempt to set Characteristic On ->', value);
   }
 
   /**
@@ -127,15 +123,5 @@ export class IntelligentOctopusGoPlatformAccessory {
     return isOn;
   }
 
-  /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, changing the Brightness
-   */
-  async setBrightness(value: CharacteristicValue) {
-    // implement your own code to set the brightness
-    this.exampleStates.Brightness = value as number;
-
-    this.platform.log.debug('Set Characteristic Brightness -> ', value);
-  }
 
 }
