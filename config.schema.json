@@ -11,6 +11,12 @@
         "required":true,
         "default":"Intelligent Octopus Go"
       },
+      "accountNumber": {
+        "title": "Octopus Account Number",
+        "type": "string",
+        "required": true,
+        "placeholder":"Enter your Octopus account number"
+      },
       "apikey": {
         "title": "Octopus API Key",
         "type": "string",
