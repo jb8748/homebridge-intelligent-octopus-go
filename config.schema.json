@@ -6,10 +6,16 @@
     "type": "object",
     "properties": {
       "name": {
+        "title":"Name",
+        "type":"String",
+        "required":true,
+        "default":"Intelligent Octopus Go"
+      },
+      "apikey": {
         "title": "Octopus API Key",
         "type": "string",
         "required": true,
-        "default": "Example API Key"
+        "placeholder":"Enter your Octopus account API key"
       }
     }
   }
