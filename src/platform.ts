@@ -2,6 +2,7 @@ import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, 
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { IntelligentOctopusGoPlatformAccessory } from './platformAccessory';
+import { OctopusQueries, callAtX9MinuteTimer, callAt00SecondTimer, OctopusStatuses } from './queries';
 
 /**
  * HomebridgePlatform
@@ -30,6 +31,46 @@ export class IntelligentOctopusGoPlatform implements DynamicPlatformPlugin {
       log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
       this.discoverDevices();
+
+      // now that everything should be set up we can start polling the Octopus API for changes
+
+      const octopusQueryObject = new OctopusQueries(this);
+
+      //const repeatingSlotsFunction = () => {
+      //  octopusQueryObject.getPlannedSlots().catch(() => '').finally(() => callAtX9MinuteTimer(repeatingSlotsFunction));
+      //};
+
+      //repeatingSlotsFunction();
+
+      const repeatingTimeCheckFunction = () => {
+        log.info('Minute timer fired');
+        octopusQueryObject.getSlotStatuses().then((statuses:OctopusStatuses) => {
+          log.info(statuses.toString());
+          for (const acc of this.accessories) {
+            //log.info(acc.UUID);
+            const service = acc.getService(this.api.hap.Service.Switch);
+            if (service !== undefined) {
+              const char = service.getCharacteristic(this.api.hap.Characteristic.On);
+              switch (acc.UUID) {
+                case(this.api.hap.uuid.generate('IOGPDefaultTime')):
+                  char.updateValue(statuses.standardOffpeak);
+                  break;
+                case(this.api.hap.uuid.generate('IOGPOffpeakTime')):
+                  char.updateValue(statuses.offpeak);
+                  break;
+                case(this.api.hap.uuid.generate('IOGPChargingSlotActive')):
+                  char.updateValue(statuses.charging);
+                  break;
+                case(this.api.hap.uuid.generate('IOGPExtraSlotActive')):
+                  char.updateValue(statuses.extraOffpeak);
+                  break;
+              }
+            }
+          }
+        }).finally(() => callAt00SecondTimer(repeatingTimeCheckFunction));
+      };
+
+      repeatingTimeCheckFunction();
     });
   }
 

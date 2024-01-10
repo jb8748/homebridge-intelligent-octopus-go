@@ -16,11 +16,24 @@ export class OctopusDispatch {
   }
 }
 
+export class OctopusStatuses {
+  public standardOffpeak = false;
+  public offpeak = false;
+  public charging = false;
+  public extraOffpeak = false;
+
+  toString() {
+    // eslint-disable-next-line max-len
+    return `OctopusStatuses {standardOffpeak: ${this.standardOffpeak.toString()}, offpeak: ${this.offpeak.toString()}, charging: ${this.charging.toString()}, extraOffpeak: ${this.extraOffpeak.toString()}}`;
+  }
+}
+
 export class OctopusQueries {
 
   private octopusToken:string|undefined;
   private octopusTokenExpires:Date|undefined;
   private plannedSlotsArray:Array<OctopusDispatch> = [];
+  private lastSlotsCheck:Date|undefined;
 
   private static octopusURL = 'https://api.octopus.energy/v1/graphql/';
 
@@ -43,7 +56,7 @@ export class OctopusQueries {
 
   async getOctopusToken(): Promise<string> {
     // eslint-disable-next-line max-len
-    if (this.octopusToken !== undefined && this.octopusTokenExpires !== undefined && new Date(Date.now() + 6000) < this.octopusTokenExpires) {
+    if (this.octopusToken !== undefined && this.octopusTokenExpires !== undefined && new Date(Date.now() + 60000) < this.octopusTokenExpires) {
       return Promise.resolve(this.octopusToken);
     } else {
       this.platform.log.info('New token requested');
@@ -72,41 +85,72 @@ export class OctopusQueries {
   }
 
   async getPlannedSlots(): Promise<Array<OctopusDispatch>> {
-    return this.getOctopusToken()
-      .then(
-        (token) => axios.post(
-          OctopusQueries.octopusURL,
-          OctopusQueries.plannedSlotsQuery(this.platform.config.accountNumber),
-          {headers: {'Authorization':'JWT '+token}})
-          .then(response => {
-            try {
-              if (response.data.errors !== undefined) {
-              //Something went wrong - might investigate what later
-                this.plannedSlotsArray = [];
-                throw new Error('Server returned an error');
-              } else {
-                this.platform.log.info(response.data);
-                let plannedSlots:Array<object> = response.data.plannedDispatches;
-                // eslint-disable-next-line max-len
-                plannedSlots = [{'startDtUtc':'2023-07-25 10:47:00+00:00', 'endDtUtc':'2023-07-25 10:48:00+00:00', 'chargeKwh':'-12.00', 'meta':{'source':'smart-charge', 'location':null}}];
-                this.plannedSlotsArray = plannedSlots.map( x => new OctopusDispatch(x));
-                this.platform.log.info(this.getStandardDispatches().toString());
-                return this.plannedSlots;
+    if (this.lastSlotsCheck !== undefined && new Date(Date.now() - 10 * 60000) < this.lastSlotsCheck) {
+      this.platform.log.info('Returning cached slots');
+      return this.plannedSlots;
+    } else {
+      return this.getOctopusToken()
+        .then(
+          (token) => axios.post(
+            OctopusQueries.octopusURL,
+            OctopusQueries.plannedSlotsQuery(this.platform.config.accountNumber),
+            {headers: {'Authorization':'JWT '+token}})
+            .then(response => {
+              try {
+                this.lastSlotsCheck = new Date();
+                if (response.data.errors !== undefined) {
+                  //Something went wrong - might investigate what later
+                  throw new Error('Server returned an error');
+                } else {
+                  this.platform.log.info(response.data);
+                  const plannedSlots:Array<object> = response.data.data.plannedDispatches;
+                  // eslint-disable-next-line max-len
+                  //plannedSlots = [{'startDtUtc':'2024-01-10 11:59:00+00:00', 'endDtUtc':'2024-01-10 12:03:00+00:00', 'chargeKwh':'-12.00', 'meta':{'source':'smart-charge', 'location':null}}];
+                  this.plannedSlotsArray = plannedSlots.map( x => new OctopusDispatch(x));
+                  this.platform.log.info(this.getStandardDispatches().toString());
+                  return this.plannedSlots;
+                }
+              } catch(e:any) {
+                this.platform.log.info(e.toString());
+                throw e;
               }
-            } catch(e:any) {
-              this.platform.log.info(e.toString());
-              throw e;
-            }
-          }),
-      )
-      .catch(
-        (reason) => {
-          this.platform.log.info('Failed to get slots');
-          this.platform.log.info(reason);
-          this.plannedSlotsArray = [];
-          throw reason;
-        },
-      );
+            }),
+        )
+        .catch(
+          (reason) => {
+            this.platform.log.info('Failed to get slots');
+            this.platform.log.info(reason);
+            this.plannedSlotsArray = [];
+            throw reason;
+          },
+        );
+    }
+  }
+
+  async getSlotStatuses(): Promise<OctopusStatuses> {
+    return this.getPlannedSlots().then((slots) => {
+      const defaultSlots = this.getStandardDispatches();
+
+      const now = new Date();
+      const statuses = new OctopusStatuses();
+
+      for (const s of defaultSlots) {
+        if (s.startDtUtc <= now && s.endDtUtc > now) {
+          statuses.standardOffpeak = true;
+        }
+      }
+
+      for (const s of slots) {
+        if (s.startDtUtc <= now && s.endDtUtc > now) {
+          statuses.charging = true;
+        }
+      }
+
+      statuses.offpeak = statuses.standardOffpeak || statuses.charging;
+      statuses.extraOffpeak = !statuses.standardOffpeak && statuses.charging;
+
+      return statuses;
+    }).catch(() => new OctopusStatuses());
   }
 
   getStandardDispatches(): Array<OctopusDispatch> {
@@ -207,4 +251,19 @@ export class OctopusQueries {
     }
     return offset;
   }
+}
+
+export function callAt00SecondTimer(toCall: () => any) {
+  const toExactMinute = 60000 - (new Date().getTime() % 60000);
+  setTimeout(toCall, toExactMinute);
+}
+
+export function callAtX9MinuteTimer(toCall: () => any) {
+  const timeNow = new Date();
+  const timeNowMillis = timeNow.getTime();
+  const minsDigit = 9 - (timeNow.getMinutes() % 10);
+  const minsToAdd = minsDigit === 0 ? 9 : minsDigit;
+  timeNow.setMinutes(timeNow.getMinutes() + minsToAdd, 0);
+  const millisTo9 = timeNow.getTime() - timeNowMillis;
+  setTimeout(toCall, millisTo9);
 }
